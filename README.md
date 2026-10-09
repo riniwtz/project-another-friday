@@ -4,6 +4,10 @@ Tested **code and signal-processing tests on Linux Python 3.13**, but the full 3
 
 Includes **continuous live microphone detection** (using a rolling buffer) and offline file classification. This uses the official **SSLAM_AS2M_Finetuned** checkpoint (527 AudioSet events, ~362 MB) via Hugging Face's author-supplied EAT adapter. The code targets **Apple Silicon, macOS 14 or newer**, Python **3.14.x** (including 3.14.8). Normal CPython is recommended over the free-threaded build. The SSLAM README originally uses Python 3.9.13; this is a newer inference-only setup.
 
+### Menu bar UI (optional)
+
+A local SwiftUI menu bar app lives under [`macos/SSLAMMenuBar/`](macos/SSLAMMenuBar/). Open `SSLAMMenuBar.xcodeproj` in Xcode and run on **My Mac**; v1 uses mock detection events for the menu bar ticker and log. See [`macos/SSLAMMenuBar/README.md`](macos/SSLAMMenuBar/README.md) for menu actions and future Python wiring.
+
 ## 1. Installation
 
 ```bash
