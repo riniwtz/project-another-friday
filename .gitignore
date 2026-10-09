@@ -1,2 +1,12 @@
-.venv
+.venv/
+__pycache__/
+.pytest_cache/
+models/
+assets/class_labels_indices.csv
+demo.wav
+*.npy
+*.pyc
+result.json
+*.jsonl
+mic_test.wav
 .DS_Store
