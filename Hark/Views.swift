@@ -9,9 +9,12 @@ struct StatusLabelView: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: store.isListening ? "waveform" : "waveform.slash")
-                .font(.system(size: 13, weight: .semibold))
-                .frame(width: 17)
+            Image("logo")
+                .resizable()
+                .renderingMode(.template)
+                .scaledToFit()
+                .foregroundStyle(store.isListening ? Color.accentColor : Color.secondary)
+                .frame(width: 17, height: 17)
             Divider().frame(height: 14)
             ZStack(alignment: .leading) {
                 Text(store.menuCaption)
@@ -72,9 +75,12 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 11) {
-                Image(systemName: "waveform.path")
-                    .font(.system(size: 21, weight: .semibold))
+                Image("logo")
+                    .resizable()
+                    .renderingMode(.template)
+                    .scaledToFit()
                     .foregroundStyle(.tint)
+                    .padding(7)
                     .frame(width: 36, height: 36)
                     .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
                 Text("Hark")
