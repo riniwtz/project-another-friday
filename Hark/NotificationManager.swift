@@ -8,6 +8,9 @@ import AppKit
 @MainActor
 final class NotificationManager: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     @Published private(set) var authorization: UNAuthorizationStatus = .notDetermined
+    @Published private(set) var alertsAllowed = false
+    @Published private(set) var alertStyle: UNAlertStyle = .none
+    @Published private(set) var timeSensitiveAllowed = false
     @Published private(set) var temporarilyMutedUntil: Date?
     @Published var lastError: String?
 
@@ -26,15 +29,21 @@ final class NotificationManager: NSObject, ObservableObject, UNUserNotificationC
 
     func refreshAuthorization() {
         center.getNotificationSettings { [weak self] settings in
-            Task { @MainActor [weak self] in self?.authorization = settings.authorizationStatus }
+            Task { @MainActor [weak self] in
+                self?.authorization = settings.authorizationStatus
+                self?.alertsAllowed = settings.alertSetting == .enabled
+                self?.alertStyle = settings.alertStyle
+                self?.timeSensitiveAllowed = settings.timeSensitiveSetting == .enabled
+            }
         }
     }
 
-    func requestAuthorization() {
-        center.requestAuthorization(options: [.alert, .badge, .sound]) { [weak self] _, error in
+    func requestAuthorization(completion: (@MainActor (Bool) -> Void)? = nil) {
+        center.requestAuthorization(options: [.alert, .badge, .sound]) { [weak self] granted, error in
             Task { @MainActor [weak self] in
                 self?.lastError = error?.localizedDescription
                 self?.refreshAuthorization()
+                completion?(granted && error == nil)
             }
         }
     }
@@ -55,20 +64,51 @@ final class NotificationManager: NSObject, ObservableObject, UNUserNotificationC
     }
 
     func notify(label: String, summary: String, urgent: Bool, playSound: Bool) {
-        guard isAuthorized, !isMuted else { return }
+        guard !isMuted else {
+            lastError = "Hark alerts are temporarily muted."
+            return
+        }
+        center.getNotificationSettings { [weak self] settings in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.authorization = settings.authorizationStatus
+                self.alertsAllowed = settings.alertSetting == .enabled
+                self.alertStyle = settings.alertStyle
+                self.timeSensitiveAllowed = settings.timeSensitiveSetting == .enabled
+                if settings.authorizationStatus == .notDetermined {
+                    self.requestAuthorization { [weak self] granted in
+                        guard granted else { return }
+                        self?.notify(label: label, summary: summary, urgent: urgent, playSound: playSound)
+                    }
+                    return
+                }
+                guard self.isAuthorized else {
+                    self.lastError = "Notifications are not authorized for Hark."
+                    return
+                }
+                guard settings.alertSetting == .enabled else {
+                    self.lastError = "Notification banners are disabled for Hark in System Settings."
+                    return
+                }
+                self.enqueue(label: label, summary: summary, urgent: urgent, playSound: playSound)
+            }
+        }
+    }
+
+    private func enqueue(label: String, summary: String, urgent: Bool, playSound: Bool) {
         let content = UNMutableNotificationContent()
-        content.title = "\(urgent ? "⚠️" : Self.symbol(for: label))  \(label)"
+        content.title = urgent ? "Important: \(label) detected" : "\(label) detected"
         content.subtitle = "Hark detected a sound"
         content.body = summary
         content.categoryIdentifier = "HARK_SOUND_EVENT"
         content.threadIdentifier = "hark.\(label.lowercased().replacingOccurrences(of: " ", with: "-"))"
-        // Only request normal system delivery. Even urgent sounds are not certified safety alarms.
-        content.interruptionLevel = .active // Selected sounds use a normal visible banner.
+        // Selected sound alerts are useful only when delivered promptly. Time Sensitive
+        // delivery can appear immediately through Focus or a scheduled summary when the
+        // user has allowed it; it is not a Critical Alert and never bypasses their choice.
+        content.interruptionLevel = timeSensitiveAllowed ? .timeSensitive : .active
         if playSound { content.sound = .default }
         center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)) { [weak self] error in
-            if let error {
-                Task { @MainActor [weak self] in self?.lastError = error.localizedDescription }
-            }
+            Task { @MainActor [weak self] in self?.lastError = error?.localizedDescription }
         }
     }
 
@@ -94,15 +134,15 @@ final class NotificationManager: NSObject, ObservableObject, UNUserNotificationC
         completionHandler()
     }
 
-    static func symbol(for label: String) -> String {
+    static func systemImage(for label: String) -> String {
         switch label {
-        case "Doorbell": return "🔔"
-        case "Knocking": return "🚪"
-        case "Alarm": return "🚨"
-        case "Dog barking": return "🐕"
-        case "Crying": return "💧"
-        case "Glass breaking": return "⚠️"
-        default: return "🔊"
+        case "Doorbell": return "bell.and.waves.left.and.right"
+        case "Knocking": return "door.left.hand.closed"
+        case "Alarm": return "alarm.waves.left.and.right"
+        case "Dog barking": return "dog"
+        case "Crying": return "drop"
+        case "Glass breaking": return "exclamationmark.triangle"
+        default: return "speaker.wave.2"
         }
     }
 }

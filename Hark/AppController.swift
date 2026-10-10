@@ -2,13 +2,12 @@ import AppKit
 import SwiftUI
 
 enum AppScreen: Hashable {
-    case history, settings, models, ask, about
+    case history, settings, ask, about
 
     var title: String {
         switch self {
         case .history: return "Label History"
         case .settings: return "Hark Settings"
-        case .models: return "Local AI Models"
         case .ask: return "Ask About My Surroundings"
         case .about: return "About Hark"
         }
@@ -51,10 +50,7 @@ final class AppController: NSObject, NSApplicationDelegate {
                 size = NSSize(width: 700, height: 480)
             case .settings:
                 root = AnyView(PreferencesView().environmentObject(store))
-                size = NSSize(width: 640, height: 505)
-            case .models:
-                root = AnyView(ModelsView(manager: store.models))
-                size = NSSize(width: 690, height: 485)
+                size = NSSize(width: 760, height: 640)
             case .ask:
                 root = AnyView(AskView().environmentObject(store))
                 size = NSSize(width: 580, height: 425)
@@ -76,7 +72,9 @@ final class AppController: NSObject, NSApplicationDelegate {
             window.level = store.preferences.floatWindows ? .floating : .normal
             window.collectionBehavior = store.preferences.floatWindows
                 ? [.canJoinAllSpaces, .fullScreenAuxiliary] : []
-            window.minSize = NSSize(width: size.width - 50, height: size.height - 40)
+            window.minSize = screen == .settings
+                ? NSSize(width: 700, height: 300)
+                : NSSize(width: size.width - 50, height: size.height - 40)
             window.center()
             window.isReleasedWhenClosed = false
             windows[screen] = window
@@ -106,7 +104,7 @@ final class StatusController: NSObject {
 
         if let button = item.button {
             button.title = ""
-            button.toolTip = "Hark — local sound awareness (synthetic detections)"
+            button.toolTip = "Hark — local sound awareness"
             button.target = self
             button.action = #selector(togglePopover)
             let label = ClickThroughHostingView(rootView: StatusLabelView().environmentObject(store))

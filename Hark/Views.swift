@@ -152,7 +152,6 @@ struct PopoverView: View {
                 Divider().padding(.vertical, 4)
                 HoverMenuRow(title: "Show Label History…", symbol: "clock.arrow.circlepath") { open(.history) }
                 HoverMenuRow(title: "Ask About My Surroundings…", symbol: "text.bubble") { open(.ask) }
-                HoverMenuRow(title: "Local AI Models…", symbol: "cpu") { open(.models) }
                 HoverMenuRow(title: "Settings…", symbol: "gearshape") { open(.settings) }
                 Divider().padding(.vertical, 4)
                 HoverMenuRow(title: "About Hark", symbol: "info.circle") { open(.about) }
@@ -170,14 +169,46 @@ struct PopoverView: View {
 
 // MARK: - Settings
 
+private enum PreferencesTab: Hashable {
+    case audio, ai, alerts, general, privacy
+
+    var contentSize: NSSize {
+        switch self {
+        case .audio: NSSize(width: 800, height: 500)
+        case .ai: NSSize(width: 800, height: 750)
+        case .alerts: NSSize(width: 800, height: 700)
+        case .general: NSSize(width: 800, height: 380)
+        case .privacy: NSSize(width: 800, height: 410)
+        }
+    }
+}
+
+private struct WindowContentResizer: NSViewRepresentable {
+    let size: NSSize
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async { [weak view] in
+            guard let window = view?.window else { return }
+            let topLeft = NSPoint(x: window.frame.minX, y: window.frame.maxY)
+            let frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
+            let targetFrame = NSRect(x: topLeft.x, y: topLeft.y - frame.height,
+                                     width: frame.width, height: frame.height)
+            window.setFrame(targetFrame, display: true, animate: true)
+        }
+    }
+}
+
 struct PreferencesView: View {
     @EnvironmentObject private var store: HarkStore
+    @State private var selectedTab = PreferencesTab.audio
     @State private var inputDevices = [AudioDeviceChoice(id: "system", name: "System Default")]
     @State private var outputDevices = [AudioDeviceChoice(id: "system", name: "System Default")]
     @State private var confirmClear = false
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             Form {
                 Picker("Input device", selection: $store.preferences.inputDeviceID) {
                     ForEach(inputDevices) { Text($0.name).tag($0.id) }
@@ -193,25 +224,99 @@ struct PreferencesView: View {
                 }
                 HStack {
                     Text("Listening threshold")
-                    Slider(value: $store.preferences.listeningThreshold, in: 0.15...0.95, step: 0.05)
+                    Slider(value: $store.preferences.listeningThreshold, in: 0.10...0.90, step: 0.05)
                     Text("\(Int(store.preferences.listeningThreshold * 100))%")
                         .monospacedDigit().frame(width: 42, alignment: .trailing)
                 }
                 HStack {
                     Spacer()
                     Button("Restore Audio Defaults") {
-                        store.preferences.inputGain = 0.8
-                        store.preferences.listeningThreshold = 0.45
+                        store.preferences.inputGain = 1.0
+                        store.preferences.listeningThreshold = 0.25
                     }
                 }
-                Text("Audio devices are discovered locally. Gain and device selection are stored for the future audio pipeline; the threshold filters synthetic detections now.")
+                Text("Live mode captures microphone audio in memory and applies input gain and classification thresholds. Output device selection is retained for future audio playback (Hark does not play back recordings).")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .padding(16)
             .tabItem { Label("Audio", systemImage: "waveform") }
+            .tag(PreferencesTab.audio)
+
+            Form {
+                Toggle("Generate captions with native LFM", isOn: $store.preferences.useNativeLFM)
+                    .disabled(store.preferences.lfmDirectoryPath.isEmpty)
+                HStack(spacing: 10) {
+                    Text("LFM 1.2B MLX model folder")
+                    Spacer(minLength: 10)
+                    Text(store.preferences.lfmDirectoryPath.isEmpty ? "Not selected" : (store.preferences.lfmDirectoryPath as NSString).lastPathComponent)
+                        .lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary)
+                    Button("Choose…") { store.chooseLFMDirectory() }
+                }
+                Button("Test Native LFM") { store.testNativeLFM() }
+                    .disabled(store.preferences.lfmDirectoryPath.isEmpty)
+                Text(store.liveStatus)
+                    .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                Divider()
+                Text("SSLAM AudioSet-2M checkpoint")
+                    .font(.headline)
+                Text(store.preferences.sslamDirectoryPath)
+                    .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                HStack {
+                    Text("Converted SSLAM Core ML")
+                    Spacer()
+                    Text(store.preferences.sslamCoreMLPath.isEmpty ? "Not selected" : (store.preferences.sslamCoreMLPath as NSString).lastPathComponent)
+                        .lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary)
+                    Button("Choose…") { store.chooseSSLAMModel() }
+                        .disabled(store.isBenchmarkRunning || store.isListening)
+                }
+                Button("Test Native SSLAM") { store.testNativeSSLAM() }
+                    .disabled(store.preferences.sslamCoreMLPath.isEmpty || store.isBenchmarkRunning)
+                Picker("SSLAM compute units", selection: $store.preferences.sslamComputeMode) {
+                    ForEach(SSLAMComputeMode.allCases) { mode in
+                        Text(mode.title).tag(mode.rawValue)
+                    }
+                }
+                .disabled(store.isListening || store.isBenchmarkRunning)
+                HStack {
+                    Button("Benchmark SSLAM (5 runs)") { store.benchmarkNativeSSLAM() }
+                        .disabled(store.preferences.sslamCoreMLPath.isEmpty || store.isListening || store.isBenchmarkRunning)
+                    if store.isBenchmarkRunning { ProgressView().controlSize(.small) }
+                    if store.benchmarkFilePath != nil {
+                        Button("Show Report in Finder") { store.showBenchmarkInFinder() }
+                    }
+                }
+                if let timing = store.lastSSLAMTimings {
+                    Text(String(format: "Live timing — Resample %.0f · Fbank %.0f · Input %.0f · Core ML %.0f · Labels %.0f · Total %.0f ms · Skipped %d",
+                                timing.resampleMS, timing.filterbankMS, timing.inputCopyMS, timing.predictionMS,
+                                timing.postprocessMS, timing.totalMS, store.skippedAudioWindows))
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                }
+                if let report = store.sslamBenchmark {
+                    Text(String(format: "Benchmark (%d runs) — Prediction median %.0f ms, p95 %.0f ms · Fbank median %.0f ms · Total median %.0f ms",
+                                report.iterations, report.medianPredictionMS, report.p95PredictionMS,
+                                report.medianFilterbankMS, report.medianTotalMS))
+                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                }
+                Picker("Sound detection source", selection: $store.preferences.liveMode) {
+                    Text("Synthetic events").tag(false)
+                    Text("Live microphone · SSLAM Core ML").tag(true)
+                }
+                .disabled(store.isListening)
+                if let ms = store.lastAudioInferenceMS {
+                    Text("Last SSLAM inference: \(Int(ms)) ms").font(.caption).foregroundStyle(.secondary)
+                }
+                Label("Native SSLAM requires a validated Core ML conversion. Run the one-time conversion and compare predictions on actual sound clips before relying on live alerts.", systemImage: "info.circle")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("All inference stays inside Hark. Neither Python nor LM Studio is required at runtime. Model folders must remain locally accessible.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(16)
+            .tabItem { Label("AI", systemImage: "cpu") }
+            .tag(PreferencesTab.ai)
 
             AlertSettingsView(store: store, manager: store.notifications)
                 .tabItem { Label("Alerts", systemImage: "bell") }
+                .tag(PreferencesTab.alerts)
 
             Form {
                 Toggle("Float all Hark windows above other apps", isOn: $store.preferences.floatWindows)
@@ -221,10 +326,11 @@ struct PreferencesView: View {
             }
             .padding(16)
             .tabItem { Label("General", systemImage: "gearshape") }
+            .tag(PreferencesTab.general)
 
             Form {
                 Toggle("Save sound-event metadata locally", isOn: $store.preferences.saveHistory)
-                Text("Hark currently uses synthetic sound events. No microphone recording is captured or saved. History contains only captions, labels and timestamps.")
+                Text("Synthetic and live modes are available. Live audio stays in memory, while optional event metadata, timestamps, labels, and captions are saved locally. LFM runs inside Hark.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Spacer()
@@ -234,8 +340,10 @@ struct PreferencesView: View {
             }
             .padding(16)
             .tabItem { Label("Privacy", systemImage: "hand.raised") }
+            .tag(PreferencesTab.privacy)
         }
-        .frame(minWidth: 580, minHeight: 450)
+        .frame(width: selectedTab.contentSize.width, height: selectedTab.contentSize.height)
+        .background(WindowContentResizer(size: selectedTab.contentSize))
         .background(.regularMaterial)
         .confirmationDialog("Clear all sound history?", isPresented: $confirmClear) {
             Button("Clear History", role: .destructive) { store.clearHistory() }
@@ -294,21 +402,30 @@ private struct AlertSettingsView: View {
             HStack {
                 Text("Permission")
                 Spacer()
-                Text(authDescription).foregroundStyle(.secondary)
+                Text(authDescription)
+                    .foregroundStyle(manager.alertStyle == .none ? .orange : .secondary)
                 Button("System Settings") { manager.openSystemNotificationSettings() }
                     .controlSize(.small)
+            }
+            if manager.isAuthorized && manager.alertStyle == .none {
+                Label("Choose Banners or Alerts for Hark in System Settings to show notifications on screen.",
+                      systemImage: "rectangle.badge.exclamationmark")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
             }
             Toggle("Play a notification sound", isOn: $store.preferences.notificationSoundEnabled)
             Divider()
             Text("Notify only for selected sounds").font(.headline)
             ForEach(HarkStore.alertOptions, id: \.self) { label in
-                Toggle(label, isOn: Binding(
+                Toggle(isOn: Binding(
                     get: { store.preferences.alertLabels.contains(label) },
                     set: { value in
                         if value { store.preferences.alertLabels.insert(label) }
                         else { store.preferences.alertLabels.remove(label) }
                     }
-                ))
+                )) {
+                    Label(label, systemImage: NotificationManager.systemImage(for: label))
+                }
             }
             Toggle("Mute repeated alerts", isOn: $store.preferences.muteRepeatedAlerts)
             if store.preferences.muteRepeatedAlerts {
@@ -331,12 +448,11 @@ private struct AlertSettingsView: View {
                 Button("Send Test Notification") {
                     manager.sendTestNotification(playSound: store.preferences.notificationSoundEnabled)
                 }
-                .disabled(!manager.isAuthorized)
             }
             if let error = manager.lastError {
                 Text(error).font(.caption).foregroundStyle(.red)
             }
-            Text("Synthetic detections must persist across two frames. Hark requests notification permission only when enabled. Delivery and banner appearance obey macOS notification preferences and Focus.")
+            Text("Detections must persist across two inference results. Notifications are not certified safety alarms and may be delayed by classification or macOS Focus. Permission is requested only when enabled.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(16)
@@ -345,7 +461,9 @@ private struct AlertSettingsView: View {
 
     private var authDescription: String {
         switch manager.authorization {
-        case .authorized: return "Allowed"
+        case .authorized:
+            guard manager.alertsAllowed else { return "Banners disabled" }
+            return manager.alertStyle == .none ? "Notification Center only" : "Allowed"
         case .provisional: return "Provisional"
         case .denied: return "Denied"
         case .notDetermined: return "Not requested"
@@ -383,7 +501,7 @@ struct HistoryView: View {
             Divider()
             if filtered.isEmpty {
                 ContentUnavailableView("No matching sound events", systemImage: "waveform",
-                                       description: Text("Start listening to generate synthetic events."))
+                                       description: Text("Start listening to record sound events."))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -459,7 +577,7 @@ struct ModelsView: View {
                 VStack(spacing: 10) {
                     targetRow("SSLAM", detail: "Polyphonic audio classification", installed: manager.installed("SSLAM"))
                     Divider()
-                    targetRow("LFM2.5-350M", detail: "Local scene narration and history Q&A", installed: manager.installed("LFM2.5"))
+                    targetRow("LFM2.5-1.2B Instruct 4-bit MLX", detail: "In-process narration and history Q&A", installed: manager.installed("LFM2.5"))
                 }
                 .padding(7)
             }
@@ -492,7 +610,7 @@ struct ModelsView: View {
                 }
                 .listStyle(.inset)
             }
-            Text("Checkpoint discovery does not load or execute models. All audio and captions are currently synthetic; model inference has not been integrated.")
+            Text("Model discovery does not imply compatibility. Select the LFM MLX folder and a validated Core ML SSLAM export in Settings → AI; only these selected models are loaded.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(20)
@@ -522,12 +640,13 @@ struct AskView: View {
     @State private var question = "What sounds have been happening?"
     @State private var selectedMinutes = 5
     @State private var answer = ""
+    @State private var isAsking = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
             Label("Ask About My Surroundings", systemImage: "text.bubble.fill")
                 .font(.title2.bold())
-            Text("Ask about synthetic sound events in your recent history.")
+            Text("Ask about locally recorded sound events in your recent history.")
                 .font(.subheadline).foregroundStyle(.secondary)
             Picker("Look back", selection: $selectedMinutes) {
                 Text("5 minutes").tag(5)
@@ -540,12 +659,13 @@ struct AskView: View {
                 .onSubmit { ask() }
             HStack {
                 Spacer()
+                if isAsking { ProgressView().controlSize(.small) }
                 Button("Ask") { ask() }
                     .buttonStyle(.borderedProminent)
-                    .disabled(question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(isAsking || question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             ScrollView {
-                Text(answer.isEmpty ? "A local rule-based summary will appear here. LFM2.5-350M inference is not yet connected." : answer)
+                Text(answer.isEmpty ? "With native LFM enabled, answers are generated on this Mac using saved event metadata; otherwise a deterministic synthetic summary is shown." : answer)
                     .font(.system(size: 13))
                     .foregroundStyle(answer.isEmpty ? Color.secondary : Color.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -558,7 +678,15 @@ struct AskView: View {
         .background(.regularMaterial)
     }
 
-    private func ask() { answer = store.summarize(minutes: selectedMinutes, question: question) }
+    private func ask() {
+        let prompt = question
+        let minutes = selectedMinutes
+        isAsking = true
+        Task {
+            answer = await store.askAboutSurroundings(minutes: minutes, question: prompt)
+            isAsking = false
+        }
+    }
 }
 
 struct AboutView: View {
@@ -568,9 +696,9 @@ struct AboutView: View {
                 .font(.system(size: 44)).foregroundStyle(.tint)
             Text("Hark").font(.title.bold())
             Text("Sound, made visible.").foregroundStyle(.secondary)
-            Text("Native macOS menu-bar sound awareness\nDesigned for SSLAM + LFM2.5-350M")
+            Text("Native macOS menu-bar sound awareness\nLFM2.5-1.2B MLX · SSLAM Core ML (after conversion)")
                 .multilineTextAlignment(.center).font(.subheadline)
-            Text("Prototype 0.2 · Synthetic data only · No microphone capture or AI inference")
+            Text("Prototype 0.5 · Synthetic events + optional native MLX narration")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(25)
