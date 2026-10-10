@@ -37,7 +37,10 @@
     <li><a href="#features">Features</a></li>
     <li><a href="#privacy-and-accessibility">Privacy and Accessibility</a></li>
     <li><a href="#how-it-works">How It Works</a></li>
+    <li><a href="#why-local-ai">Why Local AI?</a></li>
     <li><a href="#built-with">Built With</a></li>
+    <li><a href="#hackathon-technical-disclosure">Hackathon Technical Disclosure</a></li>
+    <li><a href="#hackathon-submission-checklist">Hackathon Submission Checklist</a></li>
     <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#project-structure">Project Structure</a></li>
     <li><a href="#status-and-goals">Status and Goals</a></li>
@@ -149,13 +152,44 @@ LFM natural-language captioning and history Q&A
 
 SSLAM identifies multiple overlapping AudioSet events and produces confidence-scored classifications. Live inference uses a converted and parity-validated Core ML model.
 
-### LFM2.5-350M — Language intelligence
+### LFM2.5-1.2B-Instruct-4bit — Language intelligence
 
 The lightweight language model turns structured detections into natural captions and answers questions about recent event history. Generated captions are checked against detected labels before display.
 
 ### SwiftUI — Native macOS experience
 
 SwiftUI and AppKit provide the menu-bar interface, adaptive windows, animated captions, history, settings, native notifications, and audio-device controls.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+---
+
+## Why Local AI?
+
+> **Why does this product benefit from running AI locally?**
+
+Hark processes a continuous stream of highly sensitive ambient audio. Running its core AI directly on the user's Mac keeps that audio private, removes round-trip cloud latency from time-sensitive sound alerts, avoids recurring inference costs, and allows sound awareness to continue when the internet or a remote AI provider is unavailable.
+
+Local execution is fundamental rather than decorative: microphone preprocessing, SSLAM sound classification, confidence filtering, caption generation, and questions about recent event history are designed to run on the device. A cloud-only implementation would require continuously transmitting information about a user's home, conversations, and surroundings while also becoming less dependable during connectivity failures—the moments when awareness may matter most.
+
+### What works without the cloud
+
+- Live microphone capture and audio preprocessing
+- SSLAM environmental sound classification
+- Confidence and persistence filtering
+- Menu-bar captions and the sound timeline
+- Selected sound alerts and native macOS notifications
+- LFM caption generation and questions about local event history
+- Local preferences and event-metadata storage
+
+### What may use the internet
+
+- Initial source-code and Swift package downloads
+- Obtaining model weights before first use
+- An explicitly requested update check when that feature is connected
+- GitHub, issue reporting, and hackathon submission links
+
+No cloud AI API is required for Hark's core runtime inference path.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -171,7 +205,80 @@ SwiftUI and AppKit provide the menu-bar interface, adaptive windows, animated ca
 - **Swift Transformers**
 - **Swift Hugging Face**
 - **SSLAM**
-- **LFM2.5-350M**
+- **LFM2.5-1.2B-Instruct-4bit**
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+---
+
+## Hackathon Technical Disclosure
+
+This section consolidates the technical disclosures required by the AppBuildersPH Hackathon 2026 Local AI challenge.
+
+### Models
+
+| Model | Role | Execution |
+|---|---|---|
+| SSLAM AudioSet-2M fine-tuned checkpoint | Multi-label environmental sound classification | Converted to Core ML and executed on-device |
+| LFM2.5-1.2B-Instruct-4bit | Grounded captions and questions about event history | Executed on-device through MLX Swift LM |
+
+Model weights are not committed to this repository. Users must obtain compatible weights and select their local model folders in Hark's settings. The SSLAM export must pass the app's conversion and feature-parity checks.
+
+### Frameworks and major tools
+
+- Swift, SwiftUI, and AppKit
+- AVFoundation, Accelerate, Core Audio, and AudioToolbox
+- Core ML
+- MLX Swift and MLX Swift LM
+- Swift Transformers
+- Swift Hugging Face
+- Xcode and Swift Package Manager
+
+### APIs and cloud services
+
+Hark uses Apple platform APIs for microphone capture, Core ML inference, window management, notifications, and launch-at-login behavior. It does **not** use a remote AI inference API for core functionality. Network access is limited to development/setup downloads and optional external actions such as future manual update checks.
+
+### Existing code and assets
+
+- Open-source model implementations and Swift packages are used under their respective licenses and are resolved through Swift Package Manager.
+- The Hark logo in `Hark/logo.png` is a team-provided asset.
+- Repository history remains public so judges can inspect the development timeline and distinguish new work from reused foundations.
+- Any additional code or asset created before the official build window must be itemized here by the team before final submission.
+
+### AI-assisted development
+
+OpenAI Codex was used as an AI coding assistant for implementation, debugging, documentation, build validation, and Git operations. AI-assisted development is separate from Hark's runtime AI models and is disclosed in accordance with the hackathon rules.
+
+### Reproducibility
+
+The repository contains the complete macOS application source and pinned Swift package resolution. Judges can recreate the application using the steps in [Getting Started](#getting-started). Model weights are external because of their size and licensing; compatible local model files are required to demonstrate native inference.
+
+> [!CAUTION]
+> Do not report estimated model speed, detection accuracy, or alert latency as measured results. The targets below remain unverified until recorded with a disclosed Mac model, compute mode, model export, settings, sample set, and methodology.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+---
+
+## Hackathon Submission Checklist
+
+The public repository and technical documentation are prepared for the AppBuildersPH Hackathon 2026 submission. The team must complete the identity and video fields below before submitting once through [Cerebral Valley](https://cerebralvalley.ai/e/appbuildersph-hackathon-2026).
+
+| Required item | Status |
+|---|---|
+| Project name | Hark |
+| Short description | A private, on-device sound-awareness companion that makes environmental sounds visible on macOS. |
+| Team name and eligible members | **Add the final team name and member names to the submission form.** |
+| Public GitHub repository | [riniwtz/project-another-friday](https://github.com/riniwtz/project-another-friday) |
+| Working, reproducible product | Source and build instructions included; compatible local model files are required. |
+| Explanation of local execution | [Why Local AI?](#why-local-ai) |
+| Explanation of internet requirements | [What may use the internet](#what-may-use-the-internet) |
+| Models, frameworks, APIs, code/assets, and AI tools | [Hackathon Technical Disclosure](#hackathon-technical-disclosure) |
+| Demo video | **Add the final demo-video URL to the submission form.** |
+| X or LinkedIn video post | **Add the public post URL; tag Devin/Cognition and include `#AppBuildersPH`.** |
+
+> [!IMPORTANT]
+> Submit only once, make the repository public, and stop committing by **October 10, 2026 at 10:00 AM Philippine Standard Time (UTC+8)**. The organizers state that there are no extensions or resubmissions.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
