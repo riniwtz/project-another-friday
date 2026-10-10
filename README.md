@@ -44,7 +44,6 @@
     <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#project-structure">Project Structure</a></li>
     <li><a href="#status-and-goals">Status and Goals</a></li>
-    <li><a href="#version-1-boundaries">Version 1 Boundaries</a></li>
     <li><a href="#contributing">Contributing</a></li>
   </ol>
 
@@ -222,7 +221,17 @@ This section consolidates the technical disclosures required by the AppBuildersP
 | SSLAM AudioSet-2M fine-tuned checkpoint | Multi-label environmental sound classification | Converted to Core ML and executed on-device |
 | LFM2.5-1.2B-Instruct-4bit | Grounded captions and questions about event history | Executed on-device through MLX Swift LM |
 
-Model weights are not committed to this repository. Users must obtain compatible weights and select their local model folders in Hark's settings. The SSLAM export must pass the app's conversion and feature-parity checks.
+Model weights are not committed to this repository. Download the required models from the [shared Google Drive folder](https://drive.google.com/drive/folders/1g0fOM875caRSJTQowbfNsV8dt3ObfLKa?usp=sharing), then select their local folders in Hark's settings. The SSLAM model was converted to Core ML using a Python script, and the export must pass the app's conversion and feature-parity checks.
+
+### Team
+
+**Team name:** Another Friday
+
+**Eligible members:**
+
+- Rintaro Iwata
+- Thaeron Conducto
+- Qinpei Lu
 
 ### Frameworks and major tools
 
@@ -268,13 +277,13 @@ The public repository and technical documentation are prepared for the AppBuilde
 |---|---|
 | Project name | Hark |
 | Short description | A private, on-device sound-awareness companion that makes environmental sounds visible on macOS. |
-| Team name and eligible members | **Add the final team name and member names to the submission form.** |
+| Team name and eligible members | Another Friday — Rintaro Iwata, Thaeron Conducto, Qinpei Lu |
 | Public GitHub repository | [riniwtz/project-another-friday](https://github.com/riniwtz/project-another-friday) |
 | Working, reproducible product | Source and build instructions included; compatible local model files are required. |
 | Explanation of local execution | [Why Local AI?](#why-local-ai) |
 | Explanation of internet requirements | [What may use the internet](#what-may-use-the-internet) |
 | Models, frameworks, APIs, code/assets, and AI tools | [Hackathon Technical Disclosure](#hackathon-technical-disclosure) |
-| Demo video | **Add the final demo-video URL to the submission form.** |
+| Demo video | [Watch the Hark demo](https://drive.google.com/file/d/1c0sWpcUC-Ub8kNhFJTGy_ODfdp_LuuOB/view?usp=sharing) |
 | X or LinkedIn video post | **Add the public post URL; tag Devin/Cognition and include `#AppBuildersPH`.** |
 
 > [!IMPORTANT]
@@ -291,7 +300,7 @@ The public repository and technical documentation are prepared for the AppBuilde
 - macOS 14.0 or later
 - A current version of Xcode capable of resolving the included Swift packages
 - Microphone access for live sound detection
-- Locally available, compatible model files for native SSLAM and LFM features
+- Compatible SSLAM and LFM model files from the [Hark models folder](https://drive.google.com/drive/folders/1g0fOM875caRSJTQowbfNsV8dt3ObfLKa?usp=sharing)
 
 ### Clone
 
@@ -306,8 +315,9 @@ cd project-another-friday
 2. Allow Xcode to resolve the Swift package dependencies.
 3. Select the **Hark** scheme and **My Mac** destination.
 4. Build and run the project.
-5. Grant microphone permission when enabling live listening.
-6. In **Settings → AI**, select compatible local model folders before enabling native AI features.
+5. Download the required SSLAM and LFM files from the [Hark models folder](https://drive.google.com/drive/folders/1g0fOM875caRSJTQowbfNsV8dt3ObfLKa?usp=sharing).
+6. In **Settings → AI**, select the downloaded local model folders before enabling native AI features.
+7. Grant microphone permission when enabling live listening.
 
 > [!NOTE]
 > Hark is currently a functional prototype. Native model exports must match the contracts validated by the app; selecting an arbitrary model folder is not sufficient.
@@ -353,16 +363,6 @@ project-another-friday/
 | Continuity | Useful offline and unobtrusive in the background |
 
 These are product and performance targets to validate through real-world testing, not claims of already achieved results.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
----
-
-## Version 1 Boundaries
-
-Version 1 focuses on everyday environmental sound awareness. Speech transcription, cloud synchronization, user accounts, and replacement of certified alarm systems are outside the initial scope.
-
-The goal is to make a focused set of capabilities reliable, understandable, private, and delightful to use.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

@@ -4,15 +4,34 @@ import UserNotifications
 
 // MARK: - Menu bar
 
+private struct HarkLogo: View {
+    private static let image: NSImage? = {
+        guard let url = Bundle.main.url(forResource: "logo", withExtension: "png") else {
+            return nil
+        }
+        return NSImage(contentsOf: url)
+    }()
+
+    var body: some View {
+        if let image = Self.image {
+            Image(nsImage: image)
+                .resizable()
+                .renderingMode(.template)
+                .scaledToFit()
+        } else {
+            Image(systemName: "waveform.path")
+                .resizable()
+                .scaledToFit()
+        }
+    }
+}
+
 struct StatusLabelView: View {
     @EnvironmentObject private var store: HarkStore
 
     var body: some View {
         HStack(spacing: 6) {
-            Image("logo")
-                .resizable()
-                .renderingMode(.template)
-                .scaledToFit()
+            HarkLogo()
                 .foregroundStyle(store.isListening ? Color.accentColor : Color.secondary)
                 .frame(width: 17, height: 17)
             Divider().frame(height: 14)
@@ -75,10 +94,7 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 11) {
-                Image("logo")
-                    .resizable()
-                    .renderingMode(.template)
-                    .scaledToFit()
+                HarkLogo()
                     .foregroundStyle(.tint)
                     .padding(7)
                     .frame(width: 36, height: 36)
@@ -698,8 +714,10 @@ struct AskView: View {
 struct AboutView: View {
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "waveform.path")
-                .font(.system(size: 44)).foregroundStyle(.tint)
+            HarkLogo()
+                .foregroundStyle(.tint)
+                .frame(width: 64, height: 64)
+                .accessibilityLabel("Hark logo")
             Text("Hark").font(.title.bold())
             Text("Sound, made visible.").foregroundStyle(.secondary)
             Text("Native macOS menu-bar sound awareness\nLFM2.5-1.2B MLX · SSLAM Core ML (after conversion)")
